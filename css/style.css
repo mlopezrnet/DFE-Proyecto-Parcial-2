@@ -107,7 +107,8 @@ header {
     right: 30px;
     border-radius: 50%;
     border: none;
-    padding: 10px 20px;
+    width: 60px;
+    height: 60px;
 
     background-color: hsl(221, 47%, 48%);
     color: white;
