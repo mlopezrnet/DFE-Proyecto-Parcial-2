@@ -207,6 +207,37 @@ header {
     }
 }
 
+/* permitir que todos los campos marcados como editables tengan un placeholder */
+[contenteditable=true]:empty:before {
+    content: attr(placeholder);
+    pointer-events: none;
+    display: block;
+}
+
+[contenteditable=true] {
+    border: none;
+    outline: none;
+    background-color: transparent;
+    padding: 0;
+    width: 100%;
+}
+
+.editing {
+    .text-container {
+        overflow-y: auto;
+    }
+
+    &.note {
+        filter: brightness(107%);
+        box-shadow: 0 8px 12px 0 rgba(0, 0, 0, 0.35);
+    }
+    &.priority-high {
+        filter: brightness(109%);
+    }
+    &.priority-low {
+        filter: brightness(105%);
+    }
+}
 /* remove default style from input fields */
 input {
     border: none;

@@ -33,28 +33,45 @@ document.body.addEventListener('click', (event) => {
   const targetNote = event.target.closest('.note');
   if (targetNote) {
     console.log("Dentro de una nota")
-    /*
+    targetNote.classList.add('editing');
     // Si la nota posee un dataset id, habilitar el modo de edición
     if (targetNote.dataset.id === undefined) {
       current_note = null;
+      const currentNoteContainer = document.querySelector('.editing');
+      // Si la nota clickeada contiene el atributo .editing, no hacer nada
+      if (targetNote.classList.contains('editing')) {
+        console.log("skip")
+        return;
+      }
+      currentNoteContainer.classList.remove('editing');
     } else {
       // Si la nota clickeada es la misma que la actual, no hacer nada
       if (current_note && current_note.id === targetNote.dataset.id) {
+        console.log("skip")
         return;
       }
       // Si la nota clickeada es distinta a la que se le hizo click, guardar la otra primero
       if (current_note) {
         const currentNoteContainer = document.querySelector(`[data-id="${current_note.id}"]`);
-        saveNote(currentNoteContainer);
+        const text_container = currentNoteContainer.querySelector('.text-container');
+
+        /* remove contentEditable attribute */
+        if (text_container.attributes.getNamedItem('contentEditable')) { text_container.attributes.removeNamedItem('contentEditable') };
+        text_container.scrollTop = 0;
+        currentNoteContainer.classList.remove('editing');
+        //saveNote(currentNoteContainer);
       }
       current_note = notes.find(note => note.id === targetNote.dataset.id);
+      editNote(targetNote);
       console.log("Nota actual:", current_note);
     }
-    */
   } else {
     // Clicked outside any note, save all the notes that have at least 
     // the title and description filled out, else ignore any blank notes
     console.log("Fuera de una nota")
+    const currentNoteContainer = document.querySelector('.editing');
+    currentNoteContainer.classList.remove('editing');
+
     // For each note with class new-note, call saveNote sending the note_container
     const newNotes = document.querySelectorAll('.new-note');
     newNotes.forEach(note_container => {
@@ -225,6 +242,10 @@ function displayNotes(notes) {
     }
 
     const text_container = document.createElement('div');
+    text_container.onclick = () => {
+      text_container.contentEditable = true;
+      text_container.focus();
+    };
     text_container.classList.add('text-container');
     note_container.appendChild(text_container);
 
@@ -294,6 +315,7 @@ function newBlankNote() {
   const note_container = document.createElement('div');
   note_container.classList.add('note');
   note_container.classList.add('new-note');
+  note_container.classList.add('editing');
 
   const text_container = document.createElement('div');
   text_container.classList.add('text-container');
@@ -367,6 +389,19 @@ function newBlankNote() {
 
 }
 
+function unfocusPreviousNewNote() {
+  const newNotes = document.querySelectorAll('.new-note');
+  newNotes.forEach(note_container => {
+    note_container.classList.remove('editing');
+  });
+}
+
+function editNote(note_container) {
+  console.log("Editando nota:", note_container);
+  // note_container.classList.add('editing');
+  note_container.classList.remove('completed');
+}
+
 // INICIALIZACIÓN
 
 function initButtonsHandler() {
@@ -385,6 +420,7 @@ function initButtonsHandler() {
   new_button.onclick = (event) => {
     event.stopPropagation();
     current_note = null;
+    unfocusPreviousNewNote();
     newBlankNote();
   };
 }
