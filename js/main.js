@@ -25,6 +25,8 @@ class Note {
 
 // Datos globales
 const user = '217210140';
+const add_button = document.getElementById('add-note');
+const spinner = document.getElementById('spinner');
 let notes = [];
 let current_note = null;
 
@@ -33,34 +35,45 @@ document.body.addEventListener('click', (event) => {
   const targetNote = event.target.closest('.note');
   if (targetNote) {
     console.log("Dentro de una nota")
-    /*
+    unfocusActiveNote();
+    targetNote.classList.add('active');
     // Si la nota posee un dataset id, habilitar el modo de edición
     if (targetNote.dataset.id === undefined) {
       current_note = null;
     } else {
       // Si la nota clickeada es la misma que la actual, no hacer nada
       if (current_note && current_note.id === targetNote.dataset.id) {
+        console.log("skip")
         return;
       }
       // Si la nota clickeada es distinta a la que se le hizo click, guardar la otra primero
       if (current_note) {
         const currentNoteContainer = document.querySelector(`[data-id="${current_note.id}"]`);
-        saveNote(currentNoteContainer);
+        const text_container = currentNoteContainer.querySelector('.text-container');
+
+        /* remove contentEditable attribute */
+        if (text_container.attributes.getNamedItem('contentEditable')) { text_container.attributes.removeNamedItem('contentEditable') };
+        text_container.scrollTop = 0;
+        currentNoteContainer.classList.remove('editing');
+        //saveNote(currentNoteContainer);
       }
       current_note = notes.find(note => note.id === targetNote.dataset.id);
+      editNote(targetNote);
       console.log("Nota actual:", current_note);
     }
-    */
   } else {
     // Clicked outside any note, save all the notes that have at least 
     // the title and description filled out, else ignore any blank notes
     console.log("Fuera de una nota")
+    unfocusActiveNote();
     // For each note with class new-note, call saveNote sending the note_container
     const newNotes = document.querySelectorAll('.new-note');
     newNotes.forEach(note_container => {
       saveNote(note_container)
         .then((response) => {
           if (response) {
+            spinner.classList.add('hidden');
+            add_button.classList.remove('hidden');
             const note = mapAPIToNote(response);
             console.log("Notas:", notes)
             return displayNotes(note);
@@ -75,6 +88,17 @@ document.body.addEventListener('click', (event) => {
   }
 });
 
+
+function unfocusActiveNote() {
+  const activeNotes = document.querySelectorAll('.active') ?? [];
+  activeNotes.forEach(note => {
+    note.classList.remove('active');
+  });
+}
+
+function activateNote(note_container) {
+  note_container.classList.add('active');
+}
 
 // Funciones
 function mapAPIToNotes(data) {
@@ -142,6 +166,8 @@ function saveNote(note_container) {
   );
 
   if (id === undefined) {
+    spinner.classList.remove('hidden');
+    add_button.classList.add('hidden');
     return createNewNote(note);
   } else {
     //updateNote();
@@ -225,6 +251,10 @@ function displayNotes(notes) {
     }
 
     const text_container = document.createElement('div');
+    text_container.onclick = () => {
+      text_container.contentEditable = true;
+      text_container.focus();
+    };
     text_container.classList.add('text-container');
     note_container.appendChild(text_container);
 
@@ -363,14 +393,20 @@ function newBlankNote() {
   /* note container should listen to global click event. if the click is outside the bounds of the note, save the note*/
 
   notes_container.appendChild(note_container);
+  activateNote(note_container);
   note_title.focus();
 
+}
+
+function editNote(note_container) {
+  console.log("Editando nota:", note_container);
+  note_container.classList.add('editing');
+  note_container.classList.remove('completed');
 }
 
 // INICIALIZACIÓN
 
 function initButtonsHandler() {
-  const new_button = document.getElementById('new-note');
   //const edit_button = document.getElementById('edit-button');
   //const trash_button = document.getElementById('trash-button');
 
@@ -382,9 +418,10 @@ function initButtonsHandler() {
     trashNote();
   };*/
 
-  new_button.onclick = (event) => {
+  add_button.onclick = (event) => {
     event.stopPropagation();
     current_note = null;
+    unfocusActiveNote();
     newBlankNote();
   };
 }
