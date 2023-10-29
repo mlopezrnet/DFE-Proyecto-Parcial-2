@@ -42,18 +42,23 @@ header {
     width: 100%;
 }
 
-.notes-container {
+#notes-container {
     /* intentar meter la mayor cantidad de notitas posible en el ancho, con un mínimo de 220px */
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    grid-auto-flow: dense;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
     /* tratar de llenar los espacios vacíos */
-    grid-gap: 20px;
+    gap: 20px;
     justify-content: center;
     align-content: start;
     /* Limita la altura al contenido */
     align-items: start;
     transition: 300ms;
+}
+
+#notes-container > * {
+    flex: 1;
+    min-width: 220px;
 }
 
 .note {
@@ -207,18 +212,23 @@ header {
 /* #region MEDIA QUERIES */
 
 @media (max-width: 600px) {
-    .app-container {
+    #app-container {
         padding: 15px 10px;
     }
 
     /* reducir los espacios y la fuente para que quepan dos notitas en el ancho */
-    .notes-container {
-        grid-gap: 13px 10px;
-        grid-template-columns: repeat(2, 1fr);
+    #notes-container {
+        gap: 13px 10px;
+    }
+
+    #notes-container > * {
+        flex: 1;
+        min-width: 40%;
     }
 
     .note {
         padding: 0.8em 14px;
+        max-width: 285px;
         box-shadow: 0 4px 4px 0 rgba(0, 0, 0, 0.25);
 
         &:hover {
