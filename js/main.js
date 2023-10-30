@@ -29,65 +29,114 @@ const add_button = document.getElementById('add-note');
 const spinner = document.getElementById('spinner');
 let notes = [];
 let current_note = null;
+let previous_target = null;
+
+function saveNoteContainer(note_container) {
+  if (!note_container) {
+    return;
+  }
+
+  const text_container = note_container.querySelector('.text-container');
+  if (!text_container) {
+    return;
+  }
+
+  /* remove contentEditable attribute */
+  if (text_container.attributes.getNamedItem('contentEditable')) {
+    text_container.attributes.removeNamedItem('contentEditable');
+  }
+
+  text_container.scrollTop = 0;
+  note_container.classList.remove('editing');
+
+  saveNote(note_container)
+    .then((response) => {
+      if (response) {
+        spinner.classList.add('hidden');
+        add_button.classList.remove('hidden');
+        const note = mapAPIToNote(response);
+        console.log("Notas:", notes);
+        return displayNotes(note, note_container);
+      }
+      return Promise.reject();
+    })
+    .then(() => {
+      note_container.remove();
+    })
+    .catch(() => { });
+}
 
 // Global click handler
 document.body.addEventListener('click', (event) => {
   const targetNote = event.target.closest('.note');
+  const isNewNote = event.target.closest('.new-note');
+
+  console.log("Click en:", event.target);
+
+  if (isNewNote) {
+    /* if any .editing note exists, save it first */
+    const editingNote = document.querySelector('.editing');
+    if (editingNote) {
+      saveNoteContainer(editingNote);
+    }
+    return;
+  }
   if (targetNote) {
     console.log("Dentro de una nota")
     unfocusActiveNote();
     targetNote.classList.add('active');
-    // Si la nota posee un dataset id, habilitar el modo de edición
-    if (targetNote.dataset.id === undefined) {
-      current_note = null;
-    } else {
-      // Si la nota clickeada es la misma que la actual, no hacer nada
-      if (current_note && current_note.id === targetNote.dataset.id) {
-        console.log("skip")
-        return;
-      }
-      // Si la nota clickeada es distinta a la que se le hizo click, guardar la otra primero
-      if (current_note) {
-        const currentNoteContainer = document.querySelector(`[data-id="${current_note.id}"]`);
-        const text_container = currentNoteContainer.querySelector('.text-container');
-
-        /* remove contentEditable attribute */
-        if (text_container.attributes.getNamedItem('contentEditable')) { text_container.attributes.removeNamedItem('contentEditable') };
-        text_container.scrollTop = 0;
-        currentNoteContainer.classList.remove('editing');
-        //saveNote(currentNoteContainer);
-      }
-      current_note = notes.find(note => note.id === targetNote.dataset.id);
-      editNote(targetNote);
-      console.log("Nota actual:", current_note);
+    // Si la nota clickeada es la misma que la actual, no hacer nada
+    if (previous_target?.closest('.note') === targetNote) {
+      console.log("skip")
+      return;
     }
+    // Si la nota clickeada es distinta a la que se le hizo click, guardar la otra primero
+    if (current_note) {
+      saveNoteContainer(previous_target.closest('.note'));
+      saveNewNotes();
+    } else {
+      saveNewNotes();
+    }
+    current_note = notes.find(note => note.id === targetNote.dataset.id);
+    if (targetNote.dataset.id) {
+      editNote(targetNote)
+      console.log("Nota actual:", current_note);
+    };
+    previous_target = event.target;
   } else {
     // Clicked outside any note, save all the notes that have at least 
     // the title and description filled out, else ignore any blank notes
     console.log("Fuera de una nota")
+    current_note = null;
     unfocusActiveNote();
-    // For each note with class new-note, call saveNote sending the note_container
-    const newNotes = document.querySelectorAll('.new-note');
-    newNotes.forEach(note_container => {
-      saveNote(note_container)
-        .then((response) => {
-          if (response) {
-            spinner.classList.add('hidden');
-            add_button.classList.remove('hidden');
-            const note = mapAPIToNote(response);
-            console.log("Notas:", notes)
-            return displayNotes(note);
-          }
-          return Promise.reject();  // si la nota está vacía, no quitarla
-        })
-        .then(() => {
-          note_container.remove();
-        })
-        .catch(() => { });
-    });
+    saveNewNotes();
+
+    // Find the note that was being edited then, call saveNote sending the note_container
+    saveNoteContainer(document.querySelector('.editing'));
   }
 });
 
+function saveNewNotes() {
+  // For each note with class new-note, call saveNote sending the note_container
+  const newNotes = document.querySelectorAll('.new-note');
+  newNotes.forEach(note_container => {
+    saveNote(note_container)
+      .then((response) => {
+        if (response) {
+          spinner.classList.add('hidden');
+          add_button.classList.remove('hidden');
+          const note = mapAPIToNote(response);
+          console.log("Notas:", notes);
+          return displayNotes(note);
+        }
+        return Promise.reject(); // si la nota está vacía, no quitarla
+      })
+      .then(() => {
+        note_container.remove();
+      })
+      .catch(() => { });
+  });
+}
 
 function unfocusActiveNote() {
   const activeNotes = document.querySelectorAll('.active') ?? [];
@@ -98,6 +147,7 @@ function unfocusActiveNote() {
 
 function activateNote(note_container) {
   note_container.classList.add('active');
+  note_container.click();
 }
 
 // Funciones
@@ -125,7 +175,13 @@ function mapAPIToNote(data) {
     data.tag,
     data.dueDate
   );
-  notes.push(newNote);
+  /* if ID already exists, update it, otherwise push it to the array */
+  const index = notes.findIndex(note => note.id === newNote.id);
+  if (index !== -1) {
+    notes[index] = newNote;
+  } else {
+    notes.push(newNote);
+  }
   return newNote;
 }
 
@@ -142,16 +198,37 @@ function getNotes() {
 
 function saveNote(note_container) {
   const id = note_container.dataset.id;
-  const title = note_container.querySelector('.title-placeholder').value;
-  const description = note_container.querySelector('.description-placeholder').value;
-  const completed = false;
-  const priority = note_container.querySelector('.priority-select').value;
-  const tagInput = note_container.querySelector('.tag-placeholder');
-  const tags = tagInput.value.trim() === '' ? [] : tagInput.value.split(',').map(tag => tag.trim());
-  const dueDate = note_container.querySelector('.date-placeholder').value === '' ? null : new Date(note_container.querySelector('.date-placeholder').value).getTime() / 1000;
+  let title = note_container.querySelector('.title-placeholder')?.value ?? note_container.querySelector('h4')?.innerText;
+  const descInput = note_container.querySelector('.description-placeholder')?.value ?? Array.from(note_container.querySelectorAll('.text-container p, .text-container div'));
+  const description = Array.isArray(descInput) ? descInput.map(p => p.innerText.trim())?.filter(p => p !== '') : descInput;
+  const completed = note_container.classList.contains('completed');
+  const priority = note_container.querySelector('.priority-select')?.value ?? current_note.priority;
+  const tagInput = note_container.querySelector('.tag-placeholder') ?? null;
+  let tags = [];
+  if (tagInput === null) {
+    tags = current_note.tag;
+  } else {
+    tags = tagInput?.value.trim() === '' ? [] : tagInput?.value.split(',').map(tag => tag.trim());
+  }
+  const dueDate = current_note?.dueDate ? current_note.dueDate : (note_container.querySelector('.date-placeholder')?.value === '' ? null : new Date(note_container.querySelector('.date-placeholder')?.value).getTime() / 1000);
 
+  const titleIsEmpty = title ? title.replace(/<br>/g, '').trim() === '' : true;
+  if (titleIsEmpty) { title = "" }
+  const descriptionIsEmpty = Array.isArray(description) ? description.every(p => p.trim() === '') : description?.trim() === '';
   // si la nota no tiene título ni descripción, no guardarla
-  if (!title && !description) {
+  if (titleIsEmpty && descriptionIsEmpty) {
+    if (id !== undefined) {
+      trashNote(id)
+        .then((response) => {
+          spinner.classList.add('hidden');
+          add_button.classList.remove('hidden');
+      /* find the note container with the id and remove it */;
+          const note_container = document.querySelector(`[data-id="${response.id}"]`);
+          note_container.remove();
+          current_note = null;
+          return response;
+        });
+    }
     return Promise.reject();
   }
 
@@ -170,7 +247,7 @@ function saveNote(note_container) {
     add_button.classList.add('hidden');
     return createNewNote(note);
   } else {
-    //updateNote();
+    return updateNote(id, note);
   }
 }
 
@@ -185,25 +262,22 @@ function createNewNote(note) {
     });
 }
 
-function updateNote() {
-  const id = current_note.id;
-  const note = current_note;
-
+function updateNote(id, note) {
   return fetchAPI(`users/${user}/tasks/${id}`, 'PUT', note)
     .then(response => {
       console.log('Nota actualizada:', response);
+      return response;
     })
     .catch(error => {
       console.error('Error al actualizar la nota:', error);
     });
 }
 
-function trashNote() {
-  const id = current_note.id;
-
+function trashNote(id) {
   return fetchAPI(`users/${user}/tasks/${id}`, 'DELETE')
     .then(response => {
       console.log('Nota eliminada:', response);
+      return response;
     })
     .catch(error => {
       console.error('Error al eliminar la nota:', error);
@@ -215,7 +289,7 @@ function clearNotesContainer() {
   notes_container.innerHTML = '';
 }
 
-function displayNotes(notes) {
+function displayNotes(notes, old_pos = null) {
   const notes_container = document.getElementById('notes-container');
 
   notes = Array.isArray(notes) ? notes : [notes];
@@ -264,7 +338,10 @@ function displayNotes(notes) {
 
     /* If note.description is not an array already, make a single element array */
     const descriptions = Array.isArray(note.description) ? note.description : [note.description];
-
+    if (descriptions.length === 0) {
+      const note_description = document.createElement('p');
+      text_container.appendChild(note_description);
+    }
     descriptions.forEach(paragraph => {
       const note_description = document.createElement('p');
       note_description.innerText = paragraph;
@@ -299,6 +376,10 @@ function displayNotes(notes) {
     */
 
     /* append always before any notes with .new-note class */
+    if (old_pos !== null) {
+      return notes_container.insertBefore(note_container, old_pos);
+    }
+
     const newNotes = document.querySelectorAll('.new-note');
     if (newNotes.length > 0) {
       return notes_container.insertBefore(note_container, newNotes[0]);
@@ -312,7 +393,9 @@ function formatDate(date) {
   const formattedDate = `${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`;
 
   if (!(date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0)) {
-    return `${formattedDate} ${date.getHours()}:${date.getMinutes()}`;
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${formattedDate} ${hours}:${minutes}`;
   }
 
   return formattedDate;
@@ -332,7 +415,7 @@ function newBlankNote() {
   const note_dueDate = document.createElement('input');
   note_dueDate.setAttribute('type', 'datetime-local');
   note_dueDate.classList.add('date-placeholder');
-  text_container.appendChild(note_dueDate);
+  note_container.appendChild(note_dueDate);
 
   const note_title = document.createElement('input');
   note_title.setAttribute('type', 'text');
@@ -351,7 +434,7 @@ function newBlankNote() {
   note_tag.setAttribute('type', 'text');
   note_tag.setAttribute('placeholder', 'Tags');
   note_tag.classList.add('tag-placeholder');
-  text_container.appendChild(note_tag);
+  note_container.appendChild(note_tag);
 
   const note_priority = document.createElement('select');
   note_priority.setAttribute('type', 'text');
@@ -362,7 +445,7 @@ function newBlankNote() {
     <option selected class="sel-priority-medium" value="medium">Media</option>
     <option class="sel-priority-low" value="low">Baja</option>
   `;
-  text_container.appendChild(note_priority);
+  note_container.appendChild(note_priority);
 
   note_priority.onchange = () => {
     note_container.classList.remove('priority-high');
@@ -401,7 +484,97 @@ function newBlankNote() {
 function editNote(note_container) {
   console.log("Editando nota:", note_container);
   note_container.classList.add('editing');
-  note_container.classList.remove('completed');
+  //note_container.classList.remove('completed');
+
+
+
+  /* set date container to hidden */
+  const date_container = note_container.querySelector('.date-container');
+  const note_dueDate = document.createElement('input');
+  note_dueDate.setAttribute('type', 'datetime-local');
+  note_dueDate.classList.add('date-placeholder');
+  if (date_container) {
+    /* set the dueDate, if there is one */
+    if (current_note.dueDate) {
+      const date = new Date(current_note.dueDate * 1000);
+      const year = date.getFullYear();
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      note_dueDate.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+    date_container.style.visibility = 'hidden';
+  }
+  note_container.appendChild(note_dueDate);
+
+  /* set tags container to visibility hidden */
+  const tags_container = note_container.querySelector('.tags-container');
+  /* set the tags as a comma separated string */
+  const tags = note_container.querySelectorAll('.tags-container p');
+  const tags_string = Array.from(tags).map(tag => tag.innerText).join(', ');
+
+  const note_tag = document.createElement('input');
+  note_tag.setAttribute('type', 'text');
+  note_tag.setAttribute('placeholder', 'Tags');
+  note_tag.classList.add('tag-placeholder');
+  note_tag.value = tags_string;
+  if (tags_container) {
+    tags_container.style.visibility = 'hidden';
+  }
+  note_container.appendChild(note_tag);
+
+
+  const note_priority = document.createElement('select');
+  note_priority.setAttribute('type', 'text');
+  note_priority.setAttribute('placeholder', 'Prioridad');
+  note_priority.classList.add('priority-select');
+  /* set the current priority as selected */
+  note_priority.innerHTML = `
+  <option class="sel-priority-high" value="high" ${current_note.priority === 'high' ? 'selected' : ''}>Alta</option>
+  <option class="sel-priority-medium" value="medium" ${current_note.priority === 'medium' ? 'selected' : ''}>Media</option>
+  <option class="sel-priority-low" value="low" ${current_note.priority === 'low' ? 'selected' : ''}>Baja</option>
+  `;
+  note_container.appendChild(note_priority);
+
+  note_priority.onchange = () => {
+    note_container.classList.remove('priority-high');
+    note_container.classList.remove('priority-low');
+
+    if (note_priority.value === 'high') {
+      note_container.classList.add('priority-high');
+    } else if (note_priority.value === 'low') {
+      note_container.classList.add('priority-low');
+    }
+  }
+
+  const note_done = document.createElement('span');
+  note_done.innerText = '✔';
+  note_done.classList.add('btn-task-done');
+  note_done.onclick = () => {
+    note_container.classList.toggle('completed');
+  };
+  note_container.appendChild(note_done);
+
+  const note_dismiss = document.createElement('span');
+  note_dismiss.innerText = '✖';
+  note_dismiss.classList.add('btn-close');
+  note_dismiss.onclick = () => {
+    spinner.classList.remove('hidden');
+    add_button.classList.add('hidden');
+    trashNote(current_note.id)
+      .then((response) => {
+        spinner.classList.add('hidden');
+        add_button.classList.remove('hidden');
+      /* find the note container with the id and remove it */;
+        const note_container = document.querySelector(`[data-id="${response.id}"]`);
+        note_container.remove();
+        current_note = null;
+      });
+  };
+  note_container.appendChild(note_dismiss);
+
+
 }
 
 // INICIALIZACIÓN
@@ -428,10 +601,14 @@ function initButtonsHandler() {
 
 function initNotes() {
   notes = []
+  add_button.classList.add('hidden');
+  spinner.classList.remove('hidden');
   getNotes().then(() => {
     clearNotesContainer();
     displayNotes(notes);
     initButtonsHandler();
+    add_button.classList.remove('hidden');
+    spinner.classList.add('hidden');
   });
 }
 

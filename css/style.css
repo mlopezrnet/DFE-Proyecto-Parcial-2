@@ -308,15 +308,10 @@ header {
         opacity: 0;
     }
 }
+
 /* #endregion */
 
 /* permitir que todos los campos marcados como editables tengan un placeholder */
-[contenteditable=true]:empty:before {
-    content: attr(placeholder);
-    pointer-events: none;
-    display: block;
-}
-
 [contenteditable=true] {
     border: none;
     outline: none;
@@ -326,9 +321,18 @@ header {
 }
 
 .editing {
+    padding-top: 30px;
+    padding-bottom: 40px;
+
     .text-container {
         overflow-y: auto;
     }
+
+    & h4:empty::before {
+        content: "Título";
+        color: hsla(0, 0%, 5%, 0.4);
+    }
+
 }
 
 .active {
@@ -457,6 +461,20 @@ select {
     border-top-right-radius: 3px;
     padding: 0.2em 0.5em;
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
+}
+
+.btn-task-done {
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: 14px;
+    user-select: none;
+    color: white;
+    background-color: hsla(0, 0%, 15%, 0.4);
+    border-bottom-right-radius: 6px;
+    border-top-left-radius: 3px;
+    padding: 0.2em 0.5em;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
 }
 
 /* #region MEDIA QUERIES */
