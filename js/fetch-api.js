@@ -1,4 +1,4 @@
-export const apiURL = 'https://653485e2e1b6f4c59046c7c7.mockapi.io/api';
+export const apiURL = 'https://66518f4a20f4f4c442780634.mockapi.io/api';
 
 export const isValidUrl = urlString => {
   try {
